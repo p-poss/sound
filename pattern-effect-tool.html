@@ -173,7 +173,8 @@
     }
 
     .row-option + .row-slider .row-inner,
-    .row-slider + .row-slider .row-inner {
+    .row-slider + .row-slider .row-inner,
+    .row-option + .row-option .row-inner {
       border-top: 1px solid rgba(255,255,255,0.1);
     }
 
@@ -405,6 +406,18 @@
         <div class="row row-option" data-effect="ripple">
           <div class="row-inner">
             <span class="label">ENABLED</span>
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </div>
+        </div>
+        <div class="row row-option active" data-effect="image">
+          <div class="row-inner">
+            <span class="label">IMAGE</span>
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </div>
+        </div>
+        <div class="row row-option" data-effect="wireframe">
+          <div class="row-inner">
+            <span class="label">WIREFRAME</span>
             <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
           </div>
         </div>
@@ -1017,6 +1030,17 @@
     `;
 
     // =====================================================
+    // Wireframe Fragment Shader (dark grey)
+    // =====================================================
+    const wireframeFragmentShader = `
+      precision highp float;
+
+      void main() {
+        gl_FragColor = vec4(0.3, 0.3, 0.3, 0.6);
+      }
+    `;
+
+    // =====================================================
     // Three.js Setup
     // =====================================================
     const canvas = document.getElementById('glCanvas');
@@ -1054,6 +1078,12 @@
     let material;
     let mesh;
     let texture;
+
+    // Wireframe overlay
+    let wireframeMaterial;
+    let wireframeMesh;
+    let wireframeEnabled = false;
+    let imageVisible = true;
 
     // State variables
     let speed = 0.5;
@@ -1094,6 +1124,7 @@
     const defaults = {
       paletteEnabled: true, speed: 0.5, frequency: 4, intensity: 5.8, strength: 4.2,
       rippleEnabled: false, rippleFreq: 8.0, rippleAmplitude: 0.02, rippleSpeed: 0.1,
+      imageVisible: true, wireframeEnabled: false,
       bloomEnabled: false, bloomIntensity: 5, bloomThreshold: 7,
       blurEnabled: false, blurStrength: 3
     };
@@ -1147,6 +1178,23 @@
       return { width: meshWidth, height: meshHeight };
     }
 
+    // Create wireframe material
+    function createWireframeMaterial() {
+      return new THREE.ShaderMaterial({
+        vertexShader: vertexShaderSource,
+        fragmentShader: wireframeFragmentShader,
+        wireframe: true,
+        transparent: true,
+        depthTest: false,
+        uniforms: {
+          uTime: { value: 0 },
+          uAmplitude: { value: rippleAmplitude },
+          uRippleFreq: { value: rippleFreq },
+          uRippleProgress: { value: 0 }
+        }
+      });
+    }
+
     // Load image
     function loadImage(src) {
       const loader = new THREE.TextureLoader();
@@ -1159,14 +1207,26 @@
           material.dispose();
         }
 
+        if (wireframeMesh) {
+          scene.remove(wireframeMesh);
+          wireframeMaterial.dispose();
+        }
+
         material = createMaterial(texture);
         mesh = new THREE.Mesh(geometry, material);
+
+        // Create wireframe mesh
+        wireframeMaterial = createWireframeMaterial();
+        wireframeMesh = new THREE.Mesh(geometry, wireframeMaterial);
+        wireframeMesh.visible = wireframeEnabled;
 
         // Scale mesh to image size
         const size = calculateMeshSize();
         mesh.scale.set(size.width, size.height, 1);
+        wireframeMesh.scale.set(size.width, size.height, 1);
 
         scene.add(mesh);
+        scene.add(wireframeMesh);
 
         imageLoaded = true;
       });
@@ -1214,6 +1274,9 @@
       if (mesh) {
         const size = calculateMeshSize();
         mesh.scale.set(size.width, size.height, 1);
+        if (wireframeMesh) {
+          wireframeMesh.scale.set(size.width, size.height, 1);
+        }
       }
 
       if (material) {
@@ -1266,6 +1329,14 @@
       material.uniforms.uBlurEnabled.value = blurEnabled;
       material.uniforms.uBlurStrength.value = blurStrength;
 
+      // Sync wireframe uniforms
+      if (wireframeMaterial) {
+        wireframeMaterial.uniforms.uTime.value = rippleTime;
+        wireframeMaterial.uniforms.uAmplitude.value = finalAmp;
+        wireframeMaterial.uniforms.uRippleFreq.value = rippleFreq;
+        wireframeMaterial.uniforms.uRippleProgress.value = rippleEnabled ? 1.0 : 0.0;
+      }
+
       renderer.render(scene, camera);
       requestAnimationFrame(render);
     }
@@ -1313,7 +1384,7 @@
     setupSlider('bloomThreshold', v => bloomThreshold = v, 1);
     setupSlider('blurStrength', v => blurStrength = v, 1);
 
-    // Effect toggles (ripple, palette, bloom, blur)
+    // Effect toggles (ripple, palette, bloom, blur, wireframe)
     document.querySelectorAll('[data-effect]').forEach(option => {
       option.addEventListener('click', () => {
         const effectName = option.dataset.effect;
@@ -1330,6 +1401,18 @@
         } else if (effectName === 'blur') {
           blurEnabled = !blurEnabled;
           option.classList.toggle('active', blurEnabled);
+        } else if (effectName === 'image') {
+          imageVisible = !imageVisible;
+          option.classList.toggle('active', imageVisible);
+          if (mesh) {
+            mesh.visible = imageVisible;
+          }
+        } else if (effectName === 'wireframe') {
+          wireframeEnabled = !wireframeEnabled;
+          option.classList.toggle('active', wireframeEnabled);
+          if (wireframeMesh) {
+            wireframeMesh.visible = wireframeEnabled;
+          }
         }
       });
     });
@@ -1390,6 +1473,18 @@
       document.getElementById('rippleAmplitudeValue').textContent = rippleAmplitude.toFixed(2);
       document.getElementById('rippleSpeedValue').textContent = rippleSpeed.toFixed(2);
 
+      // Reset image visibility
+      imageVisible = defaults.imageVisible;
+      if (mesh) {
+        mesh.visible = imageVisible;
+      }
+
+      // Reset wireframe
+      wireframeEnabled = defaults.wireframeEnabled;
+      if (wireframeMesh) {
+        wireframeMesh.visible = wireframeEnabled;
+      }
+
       // Reset post-processing
       bloomEnabled = defaults.bloomEnabled;
       bloomIntensity = defaults.bloomIntensity;
@@ -1420,6 +1515,10 @@
           opt.classList.toggle('active', defaults.paletteEnabled);
         } else if (effect === 'ripple') {
           opt.classList.toggle('active', defaults.rippleEnabled);
+        } else if (effect === 'image') {
+          opt.classList.toggle('active', defaults.imageVisible);
+        } else if (effect === 'wireframe') {
+          opt.classList.toggle('active', defaults.wireframeEnabled);
         } else if (effect === 'bloom') {
           opt.classList.toggle('active', defaults.bloomEnabled);
         } else if (effect === 'blur') {
