@@ -59,12 +59,12 @@
     }
 
     .row:hover {
-      background: rgba(0,0,0,0.15);
+      background: rgba(0,0,0,0.35);
     }
 
     .row-header {
       justify-content: space-between;
-      background: rgba(38, 41, 47, 0.5);
+      background: rgba(38, 41, 47, 0.7);
       backdrop-filter: blur(20px);
     }
 
@@ -99,7 +99,7 @@
       padding: 0;
       overflow: hidden;
       flex-shrink: 0;
-      background: rgba(45, 48, 54, 0.5);
+      background: rgba(45, 48, 54, 0.7);
       backdrop-filter: blur(20px);
       transition: height 0.4s ease var(--row-delay, 0s);
       display: block;
@@ -124,17 +124,17 @@
     }
 
     .section-content .row:hover {
-      background: rgba(0,0,0,0.15);
+      background: rgba(0,0,0,0.35);
     }
 
     .section-content .row.row-slider,
     .section-content .row.row-option {
-      background: rgba(50, 53, 58, 0.5);
+      background: rgba(58, 62, 68, 0.7);
     }
 
     .section-content .row.row-slider:hover,
     .section-content .row.row-option:hover {
-      background: rgba(0,0,0,0.15);
+      background: rgba(0,0,0,0.35);
     }
 
     .section.collapsed .section-content .row {
@@ -244,7 +244,7 @@
       color: #fff;
       text-align: center;
       flex-shrink: 0;
-      background: rgba(0,0,0,0.25);
+      background: rgba(0,0,0,0.35);
       border-radius: 3px;
     }
 
@@ -262,7 +262,7 @@
       line-height: 1;
       cursor: pointer;
       transition: background 0.15s ease;
-      background: rgba(38, 41, 47, 0.5);
+      background: rgba(38, 41, 47, 0.7);
       backdrop-filter: blur(20px);
       border: none;
       color: #fff;
@@ -270,7 +270,7 @@
     }
 
     .btn:hover {
-      background: rgba(0,0,0,0.15);
+      background: rgba(0,0,0,0.35);
     }
 
     .drop-zone {
@@ -310,76 +310,27 @@
       display: none;
     }
 
-    /* Audio Controls */
-    .audio-controls {
+    /* Audio Controls Panel - positioned bottom left, uses same styles as controls-panel */
+    .audio-panel {
       position: fixed;
       bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background-color: rgba(38, 41, 47, 0.85);
-      border-radius: 12px;
-      padding: 8px 16px;
+      left: 30px;
+      width: 400px;
       z-index: 100;
-      backdrop-filter: blur(20px);
+      display: flex;
+      flex-direction: column;
+      gap: 1.5px;
     }
 
-    .audio-controls__label {
-      color: rgba(255,255,255,0.6);
-      font-size: 12px;
-      font-weight: 600;
-      margin-right: 4px;
+    .audio-panel .btn.active {
+      background: rgba(40, 75, 50, 0.7);
     }
 
-    .audio-controls__btn {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 8px;
-      font-family: 'Inter', sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      background-color: rgba(255,255,255,0.1);
-      color: #fff;
-      cursor: pointer;
-      transition: background-color 0.2s ease, transform 0.1s ease;
+    .audio-panel .btn.active:hover {
+      background: rgba(0,0,0,0.35);
     }
 
-    .audio-controls__btn:hover {
-      background-color: rgba(255,255,255,0.15);
-    }
-
-    .audio-controls__btn:active {
-      transform: scale(0.97);
-    }
-
-    .audio-controls__btn.active {
-      background-color: #4CAF50;
-    }
-
-    .audio-controls__btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .audio-controls__btn--file {
-      background-color: rgba(255,255,255,0.08);
-      cursor: pointer;
-    }
-
-    .audio-controls__btn--file:hover {
-      background-color: rgba(255,255,255,0.12);
-    }
-
-    .audio-controls__separator {
-      width: 1px;
-      height: 24px;
-      background-color: rgba(255,255,255,0.2);
-      margin: 0 4px;
-    }
-
-    .audio-controls__file-input {
+    #audioFileInput {
       display: none;
     }
   </style>
@@ -399,7 +350,7 @@
   <div class="controls-panel">
     <div class="section">
       <div class="row row-header">
-        <span class="label">RIPPLE</span>
+        <span class="label">PATTERN</span>
         <span class="arrow"></span>
       </div>
       <div class="section-content">
@@ -434,7 +385,7 @@
           <div class="row-inner">
             <span class="label">AMPLITUDE</span>
             <div class="slider-wrapper">
-              <input type="range" id="rippleAmplitude" min="0.01" max="0.5" step="0.01" value="0.02">
+              <input type="range" id="rippleAmplitude" min="0.01" max="0.20" step="0.01" value="0.02">
             </div>
             <span class="slider-value" id="rippleAmplitudeValue">0.02</span>
           </div>
@@ -443,7 +394,7 @@
           <div class="row-inner">
             <span class="label">SPEED</span>
             <div class="slider-wrapper">
-              <input type="range" id="rippleSpeed" min="0.01" max="0.20" step="0.01" value="0.1">
+              <input type="range" id="rippleSpeed" min="0.01" max="0.10" step="0.01" value="0.1">
             </div>
             <span class="slider-value" id="rippleSpeedValue">0.10</span>
           </div>
@@ -451,7 +402,7 @@
       </div>
     </div>
 
-    <div class="section">
+    <div class="section collapsed">
       <div class="row row-header">
         <span class="label">PALETTE</span>
         <span class="arrow"></span>
@@ -502,7 +453,7 @@
       </div>
     </div>
 
-    <div class="section">
+    <div class="section collapsed">
       <div class="row row-header">
         <span class="label">BLOOM</span>
         <span class="arrow"></span>
@@ -535,7 +486,7 @@
       </div>
     </div>
 
-    <div class="section">
+    <div class="section collapsed">
       <div class="row row-header">
         <span class="label">BLUR</span>
         <span class="arrow"></span>
@@ -565,16 +516,27 @@
     </div>
   </div>
 
-  <!-- Audio Controls -->
-  <div class="audio-controls">
-    <span class="audio-controls__label">Audio:</span>
-    <button id="audio-play-btn" class="audio-controls__btn">Play</button>
-    <label class="audio-controls__btn audio-controls__btn--file">
-      Choose File
-      <input type="file" id="audio-file-input" class="audio-controls__file-input" accept="audio/*" />
-    </label>
-    <div class="audio-controls__separator"></div>
-    <button id="audio-mic-btn" class="audio-controls__btn">Use Mic</button>
+  <!-- Audio Controls Panel -->
+  <div class="audio-panel">
+    <div class="section">
+      <div class="row row-header">
+        <span class="label">AUDIO</span>
+        <span class="arrow"></span>
+      </div>
+      <div class="section-content">
+        <div class="row row-option" id="audio-play-toggle">
+          <div class="row-inner">
+            <span class="label">PLAY / PAUSE</span>
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="button-row">
+      <button class="btn" id="audioChooseFileBtn">CHOOSE FILE</button>
+      <button class="btn" id="audioMicBtn">USE MIC</button>
+    </div>
+    <input type="file" id="audioFileInput" accept="audio/*" />
   </div>
 
   <input type="file" id="fileInput" accept="image/*">
@@ -1604,9 +1566,10 @@
     // =====================================================
     // Audio Controls
     // =====================================================
-    const playBtn = document.getElementById('audio-play-btn');
-    const micBtn = document.getElementById('audio-mic-btn');
-    const audioFileInput = document.getElementById('audio-file-input');
+    const audioPlayToggle = document.getElementById('audio-play-toggle');
+    const audioChooseFileBtn = document.getElementById('audioChooseFileBtn');
+    const audioMicBtn = document.getElementById('audioMicBtn');
+    const audioFileInput = document.getElementById('audioFileInput');
 
     audioFileInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -1616,12 +1579,11 @@
         await audioAnalyzer.loadAudioFile(url);
 
         const isPlaying = await audioAnalyzer.togglePlay();
-        playBtn.textContent = isPlaying ? 'Pause' : 'Play';
-        playBtn.classList.toggle('active', isPlaying);
+        audioPlayToggle.classList.toggle('active', isPlaying);
       }
     });
 
-    playBtn.addEventListener('click', async () => {
+    audioPlayToggle.addEventListener('click', async () => {
       await audioAnalyzer.init();
 
       if (!audioAnalyzer.audioElement?.src) {
@@ -1630,26 +1592,27 @@
       }
 
       const isPlaying = await audioAnalyzer.togglePlay();
-      playBtn.textContent = isPlaying ? 'Pause' : 'Play';
-      playBtn.classList.toggle('active', isPlaying);
+      audioPlayToggle.classList.toggle('active', isPlaying);
     });
 
-    micBtn.addEventListener('click', async () => {
+    audioChooseFileBtn.addEventListener('click', () => {
+      audioFileInput.click();
+    });
+
+    audioMicBtn.addEventListener('click', async () => {
       await audioAnalyzer.init();
 
       if (audioAnalyzer.sourceType === 'mic' && audioAnalyzer.isPlaying) {
         audioAnalyzer.disconnectSource();
-        micBtn.textContent = 'Use Mic';
-        micBtn.classList.remove('active');
-        playBtn.disabled = false;
+        audioMicBtn.textContent = 'USE MIC';
+        audioMicBtn.classList.remove('active');
+        audioPlayToggle.classList.remove('active');
       } else {
         try {
           await audioAnalyzer.connectMicrophone();
-          micBtn.textContent = 'Stop Mic';
-          micBtn.classList.add('active');
-          playBtn.disabled = true;
-          playBtn.textContent = 'Play';
-          playBtn.classList.remove('active');
+          audioMicBtn.textContent = 'STOP MIC';
+          audioMicBtn.classList.add('active');
+          audioPlayToggle.classList.remove('active');
         } catch (e) {
           alert('Microphone access denied. Please allow microphone access.');
         }
