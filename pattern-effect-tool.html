@@ -337,6 +337,14 @@
       background: rgba(0,0,0,0.35);
     }
 
+    #audioMicBtn.active {
+      background: rgba(120, 40, 40, 0.7);
+    }
+
+    #audioMicBtn.active:hover {
+      background: rgba(0,0,0,0.35);
+    }
+
     /* Audio panel: no translate needed - panel shift from bottom anchor handles positioning */
     .audio-panel .section.collapsed .section-content .row-inner {
       transform: translateY(0);
@@ -377,10 +385,59 @@
     .mode-btn.active {
       background: rgba(0,0,0,0.35);
     }
+
+    /* Text Stack (hover mode only) */
+    .text-stack {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: left;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s ease-out;
+      z-index: 10;
+    }
+
+    .text-stack.visible {
+      opacity: 1;
+    }
+
+    .text-stack__header {
+      font-size: 32px;
+      line-height: 32px;
+      font-weight: 700;
+      color: #000;
+      text-transform: uppercase;
+      margin: 0;
+    }
+
+    .text-stack__paragraph {
+      font-size: 16px;
+      line-height: 20.8px;
+      font-weight: 400;
+      color: #000;
+      margin: 22px 0 0 0;
+    }
+
+    .text-stack__label {
+      font-size: 12px;
+      line-height: 10.8px;
+      font-weight: 700;
+      color: #767676;
+      text-transform: uppercase;
+      margin: 22px 0 0 0;
+    }
   </style>
 </head>
 <body>
   <canvas id="glCanvas"></canvas>
+
+  <!-- Text Stack (hover mode only) -->
+  <div class="text-stack" id="textStack">
+    <h1 class="text-stack__header">POKEMON</h1>
+    <p class="text-stack__paragraph">A piece of music featuring the iconic character Snorlax, striking the balance between the enchanting and nostalgic childhood moments.</p>
+    <p class="text-stack__label">ENTERTAINMENT</p>
+  </div>
 
   <!-- Mode Toggle -->
   <div class="mode-toggle">
@@ -1195,7 +1252,7 @@
 
     // Image display settings
     const maxImageWidth = 600;  // Max width like index8
-    const imageAspectRatio = 3 / 4;  // Default aspect ratio
+    const imageAspectRatio = 4 / 3;  // Default aspect ratio
 
     // Create shader material
     let material;
@@ -1383,17 +1440,17 @@
         loadImage(img.src);
       };
       img.onerror = function() {
-        // Fallback gradient (3:4 aspect ratio)
+        // Fallback gradient (4:3 aspect ratio)
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = 600;
-        tempCanvas.height = 800;
+        tempCanvas.width = 800;
+        tempCanvas.height = 600;
         const ctx = tempCanvas.getContext('2d');
-        const gradient = ctx.createRadialGradient(300, 400, 50, 300, 400, 400);
+        const gradient = ctx.createRadialGradient(400, 300, 50, 400, 300, 400);
         gradient.addColorStop(0, '#ffffff');
         gradient.addColorStop(0.5, '#666666');
         gradient.addColorStop(1, '#222222');
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 600, 800);
+        ctx.fillRect(0, 0, 800, 600);
         loadImage(tempCanvas.toDataURL());
       };
       img.src = 'statue.jpg';
@@ -1425,6 +1482,19 @@
       if (material) {
         material.uniforms.uResolution.value.set(w, h);
         material.uniforms.uCanvasAspect.value = w / h;
+      }
+
+      // Update text stack position if in hover mode
+      if (currentMode === 'hover') {
+        const textStackEl = document.getElementById('textStack');
+        if (textStackEl) {
+          const meshSize = calculateMeshSize();
+          const meshBottom = (h + meshSize.height) / 2;
+          const meshLeft = (w - meshSize.width) / 2;
+          textStackEl.style.top = (meshBottom + 20) + 'px';
+          textStackEl.style.left = meshLeft + 'px';
+          textStackEl.style.width = meshSize.width + 'px';
+        }
       }
     }
 
@@ -1584,6 +1654,24 @@
       });
     });
 
+    // Text stack element
+    const textStack = document.getElementById('textStack');
+
+    // Update text stack position based on mesh bounds
+    function updateTextStackPosition() {
+      const meshSize = calculateMeshSize();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      const meshBottom = (viewportHeight + meshSize.height) / 2;
+      const meshLeft = (viewportWidth - meshSize.width) / 2;
+
+      textStack.style.top = (meshBottom + 20) + 'px';
+      textStack.style.left = meshLeft + 'px';
+      textStack.style.width = meshSize.width + 'px';
+      textStack.style.transform = 'none';
+    }
+
     // Mode toggle (edit/hover)
     document.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1599,16 +1687,25 @@
         const controlsPanel = document.querySelector('.controls-panel');
         controlsPanel.classList.toggle('hidden', mode === 'hover');
 
+        // Toggle text stack visibility with fade
+        textStack.classList.toggle('visible', mode === 'hover');
+        if (mode === 'hover') {
+          updateTextStackPosition();
+        }
+
         // Reset hover state when switching modes
         // (hoverProgress will smoothly transition in render loop)
         if (mode === 'hover') {
           isHovering = false;
+        } else {
+          // Reset cursor when leaving hover mode
+          document.body.style.cursor = 'default';
         }
       });
     });
 
     // Mesh hover detection for hover mode
-    // Check if mouse is within the mesh bounds (not just canvas bounds)
+    // Check if mouse is within the mesh bounds + gap + text stack
     document.addEventListener('mousemove', (e) => {
       if (currentMode !== 'hover') return;
 
@@ -1620,14 +1717,20 @@
       const meshLeft = (viewportWidth - meshSize.width) / 2;
       const meshRight = (viewportWidth + meshSize.width) / 2;
       const meshTop = (viewportHeight - meshSize.height) / 2;
-      const meshBottom = (viewportHeight + meshSize.height) / 2;
 
-      // Check if mouse is within mesh bounds
+      // Extend bottom bound to include text stack
+      const textStackRect = textStack.getBoundingClientRect();
+      const bottomBound = textStackRect.bottom;
+
+      // Check if mouse is within extended bounds (image + gap + text)
       const mouseX = e.clientX;
       const mouseY = e.clientY;
 
       isHovering = mouseX >= meshLeft && mouseX <= meshRight &&
-                   mouseY >= meshTop && mouseY <= meshBottom;
+                   mouseY >= meshTop && mouseY <= bottomBound;
+
+      // Change cursor to pointer when hovering over the content area
+      document.body.style.cursor = isHovering ? 'pointer' : 'default';
     });
 
     // Also handle mouse leaving the window entirely
