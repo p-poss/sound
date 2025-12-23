@@ -41,6 +41,13 @@
       display: flex;
       flex-direction: column;
       gap: 1.5px;
+      opacity: 1;
+      transition: opacity 0.6s ease-out;
+    }
+
+    .controls-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
     }
 
     .section {
@@ -338,10 +345,48 @@
     #audioFileInput {
       display: none;
     }
+
+    /* Mode Toggle Buttons */
+    .mode-toggle {
+      position: fixed;
+      top: 30px;
+      left: 30px;
+      z-index: 1001;
+      width: 400px;
+      display: flex;
+      gap: 1px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      height: 54px;
+      background: rgba(38, 41, 47, 0.7);
+      backdrop-filter: blur(20px);
+      border: none;
+      color: #fff;
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: -0.25px;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .mode-btn:hover,
+    .mode-btn.active {
+      background: rgba(0,0,0,0.35);
+    }
   </style>
 </head>
 <body>
   <canvas id="glCanvas"></canvas>
+
+  <!-- Mode Toggle -->
+  <div class="mode-toggle">
+    <button class="mode-btn active" data-mode="edit">EDIT MODE</button>
+    <button class="mode-btn" data-mode="hover">HOVER MODE</button>
+  </div>
 
   <div class="drop-zone" id="dropZone">
     <div class="drop-zone-content">
@@ -818,6 +863,7 @@
       uniform float uAmplitude;
       uniform float uRippleFreq;
       uniform float uRippleProgress;
+      uniform float uHoverProgress;
 
       void main() {
         vec3 pos = position;
@@ -826,7 +872,7 @@
         float dist = distance(uv, vec2(0.5, 0.5));
         float decay = clamp(dist, 8.0, 10.0);
         float ripple = sin(-PI * uRippleFreq * dist + uTime) * (uAmplitude / decay);
-        ripple *= uRippleProgress;
+        ripple *= uRippleProgress * uHoverProgress;
 
         // Displace Y position for visible warping (not Z)
         pos.y += ripple;
@@ -874,6 +920,9 @@
       uniform float uBloomThreshold;
       uniform bool uBlurEnabled;
       uniform float uBlurStrength;
+
+      // Hover mode uniform
+      uniform float uHoverProgress; // 0 = no effects, 1 = full effects
 
       // =====================================================
       // Simplex Noise (webgl-noise by Ashima Arts, MIT License)
@@ -1006,10 +1055,11 @@
             noiseCoord += uTime * uGrainSpeed;
           }
 
-          // Generate noise and apply displacement
+          // Generate noise and apply displacement (scaled by hover progress)
           float noise = snoise(noiseCoord);
-          uv.x += noise * uGrainIntensity;
-          uv.y += noise * uGrainIntensity;
+          float grainAmount = uGrainIntensity * uHoverProgress;
+          uv.x += noise * grainAmount;
+          uv.y += noise * grainAmount;
         }
 
         vec4 texColor = texture2D(uTexture, uv);
@@ -1033,8 +1083,9 @@
           hsl.z = hsl.z * (0.8 + uFrequency * 0.05) + 0.1;
           hsl.z = clamp(hsl.z, 0.0, 1.0);
 
-          // Convert back to RGB
-          finalColor = hsl2rgb(hsl);
+          // Convert back to RGB and mix with original based on hover progress
+          vec3 paletteColor = hsl2rgb(hsl);
+          finalColor = mix(texColor.rgb, paletteColor, uHoverProgress);
         } else {
           // No palette - use original colors
           finalColor = texColor.rgb;
@@ -1066,7 +1117,7 @@
             processedBlur = blurredColor.rgb;
           }
 
-          finalColor = mix(finalColor, processedBlur, uBlurStrength * 0.1);
+          finalColor = mix(finalColor, processedBlur, uBlurStrength * 0.1 * uHoverProgress);
         }
 
         // Apply bloom effect
@@ -1093,7 +1144,7 @@
           }
           bloomBlur /= 25.0;
 
-          vec3 bloomProcessed = bloomBlur * (uBloomIntensity * 0.3);
+          vec3 bloomProcessed = bloomBlur * (uBloomIntensity * 0.3 * uHoverProgress);
           finalColor = screenBlend(finalColor, bloomProcessed);
         }
 
@@ -1194,6 +1245,11 @@
     let grainAnimated = false;
     let grainSpeed = 0.5;
 
+    // Mode state
+    let currentMode = 'edit'; // 'edit' or 'hover'
+    let isHovering = false;
+    let hoverProgress = 1; // 0 = no effects, 1 = full effects (start at 1 for edit mode)
+
     // Audio analyzer
     const audioAnalyzer = new AudioAnalyzer({ bufferSize: 512 });
     const audioMultiplier = 0.3;
@@ -1240,7 +1296,8 @@
           uGrainIntensity: { value: grainIntensity },
           uGrainScale: { value: grainScale },
           uGrainAnimated: { value: grainAnimated },
-          uGrainSpeed: { value: grainSpeed }
+          uGrainSpeed: { value: grainSpeed },
+          uHoverProgress: { value: hoverProgress }
         }
       });
     }
@@ -1275,7 +1332,8 @@
           uTime: { value: 0 },
           uAmplitude: { value: rippleAmplitude },
           uRippleFreq: { value: rippleFreq },
-          uRippleProgress: { value: 0 }
+          uRippleProgress: { value: 0 },
+          uHoverProgress: { value: hoverProgress }
         }
       });
     }
@@ -1389,6 +1447,12 @@
       // Update palette time (independent, fixed rate)
       paletteTime += 0.1;
 
+      // Smooth hover transition (~0.3s)
+      // Edit mode: always lerp toward 1
+      // Hover mode: lerp toward 1 if hovering, 0 if not
+      const target = (currentMode === 'edit') ? 1 : (isHovering ? 1 : 0);
+      hoverProgress += (target - hoverProgress) * 0.08;
+
       // Get audio amplitude
       const audioLevel = audioAnalyzer.getAmplitude();
       const baseAmp = rippleAmplitude;
@@ -1418,6 +1482,7 @@
       material.uniforms.uGrainScale.value = grainScale;
       material.uniforms.uGrainAnimated.value = grainAnimated;
       material.uniforms.uGrainSpeed.value = grainSpeed;
+      material.uniforms.uHoverProgress.value = hoverProgress;
 
       // Sync wireframe uniforms
       if (wireframeMaterial) {
@@ -1425,6 +1490,7 @@
         wireframeMaterial.uniforms.uAmplitude.value = finalAmp;
         wireframeMaterial.uniforms.uRippleFreq.value = rippleFreq;
         wireframeMaterial.uniforms.uRippleProgress.value = rippleEnabled ? 1.0 : 0.0;
+        wireframeMaterial.uniforms.uHoverProgress.value = hoverProgress;
       }
 
       renderer.render(scene, camera);
@@ -1516,6 +1582,59 @@
           option.classList.toggle('active', grainAnimated);
         }
       });
+    });
+
+    // Mode toggle (edit/hover)
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        if (mode === currentMode) return;
+
+        currentMode = mode;
+        document.querySelectorAll('.mode-btn').forEach(b =>
+          b.classList.toggle('active', b.dataset.mode === mode)
+        );
+
+        // Toggle controls visibility with fade
+        const controlsPanel = document.querySelector('.controls-panel');
+        controlsPanel.classList.toggle('hidden', mode === 'hover');
+
+        // Reset hover state when switching modes
+        // (hoverProgress will smoothly transition in render loop)
+        if (mode === 'hover') {
+          isHovering = false;
+        }
+      });
+    });
+
+    // Mesh hover detection for hover mode
+    // Check if mouse is within the mesh bounds (not just canvas bounds)
+    document.addEventListener('mousemove', (e) => {
+      if (currentMode !== 'hover') return;
+
+      // Get mesh screen bounds (mesh is centered in viewport)
+      const meshSize = calculateMeshSize();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      const meshLeft = (viewportWidth - meshSize.width) / 2;
+      const meshRight = (viewportWidth + meshSize.width) / 2;
+      const meshTop = (viewportHeight - meshSize.height) / 2;
+      const meshBottom = (viewportHeight + meshSize.height) / 2;
+
+      // Check if mouse is within mesh bounds
+      const mouseX = e.clientX;
+      const mouseY = e.clientY;
+
+      isHovering = mouseX >= meshLeft && mouseX <= meshRight &&
+                   mouseY >= meshTop && mouseY <= meshBottom;
+    });
+
+    // Also handle mouse leaving the window entirely
+    document.addEventListener('mouseleave', () => {
+      if (currentMode === 'hover') {
+        isHovering = false;
+      }
     });
 
     // Buttons
