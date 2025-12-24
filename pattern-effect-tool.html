@@ -1306,7 +1306,7 @@
     let currentMode = 'edit'; // 'edit' or 'hover'
     let isHovering = false;
     let hoverProgress = 1; // 0 = no effects, 1 = full effects (start at 1 for edit mode)
-    let volumeProgress = 1; // 0.1 = ducked, 1 = full volume (for hover mode audio ducking)
+    let volumeProgress = 1; // 0.05 = ducked, 1 = full volume (for hover mode audio ducking)
 
     // Audio analyzer
     const audioAnalyzer = new AudioAnalyzer({ bufferSize: 512 });
@@ -1526,13 +1526,21 @@
 
       // Audio volume ducking for hover mode (file playback only)
       // Edit mode: full volume (1.0)
-      // Hover mode: ducked (0.1) when not hovering, full (1.0) when hovering
-      const volumeTarget = (currentMode === 'edit') ? 1 : (isHovering ? 1 : 0.1);
-      volumeProgress += (volumeTarget - volumeProgress) * 0.08;
+      // Hover mode: ducked (0.05) when not hovering, full (1.0) when hovering
+      const volumeTarget = (currentMode === 'edit') ? 1 : (isHovering ? 1 : 0.05);
+      volumeProgress += (volumeTarget - volumeProgress) * 0.09;
 
       // Apply volume to audio element (file playback only, not mic)
+      // Ease-in curve: starts slow, speeds up - softer at low volumes
       if (audioAnalyzer.audioElement && audioAnalyzer.sourceType === 'file') {
-        audioAnalyzer.audioElement.volume = volumeProgress;
+        const minVol = 0.05;
+        // Normalize to 0-1 range
+        const t = (volumeProgress - minVol) / (1 - minVol);
+        // Apply ease-in (quadratic)
+        const easedT = t * t;
+        // Map back to volume range
+        const easedVolume = minVol + easedT * (1 - minVol);
+        audioAnalyzer.audioElement.volume = easedVolume;
       }
 
       // Get audio amplitude
