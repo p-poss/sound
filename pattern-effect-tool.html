@@ -1306,6 +1306,7 @@
     let currentMode = 'edit'; // 'edit' or 'hover'
     let isHovering = false;
     let hoverProgress = 1; // 0 = no effects, 1 = full effects (start at 1 for edit mode)
+    let volumeProgress = 1; // 0.1 = ducked, 1 = full volume (for hover mode audio ducking)
 
     // Audio analyzer
     const audioAnalyzer = new AudioAnalyzer({ bufferSize: 512 });
@@ -1517,11 +1518,22 @@
       // Update palette time (independent, fixed rate)
       paletteTime += 0.1;
 
-      // Smooth hover transition (~0.3s)
+      // Smooth hover transition (~0.6s)
       // Edit mode: always lerp toward 1
       // Hover mode: lerp toward 1 if hovering, 0 if not
       const target = (currentMode === 'edit') ? 1 : (isHovering ? 1 : 0);
       hoverProgress += (target - hoverProgress) * 0.08;
+
+      // Audio volume ducking for hover mode (file playback only)
+      // Edit mode: full volume (1.0)
+      // Hover mode: ducked (0.1) when not hovering, full (1.0) when hovering
+      const volumeTarget = (currentMode === 'edit') ? 1 : (isHovering ? 1 : 0.1);
+      volumeProgress += (volumeTarget - volumeProgress) * 0.08;
+
+      // Apply volume to audio element (file playback only, not mic)
+      if (audioAnalyzer.audioElement && audioAnalyzer.sourceType === 'file') {
+        audioAnalyzer.audioElement.volume = volumeProgress;
+      }
 
       // Get audio amplitude
       const audioLevel = audioAnalyzer.getAmplitude();
