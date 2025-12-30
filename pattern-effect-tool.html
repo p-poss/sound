@@ -523,11 +523,11 @@
         </div>
         <div class="row row-slider waveform-slider" style="display: none;">
           <div class="row-inner">
-            <span class="label">INTERVAL</span>
+            <span class="label">SENSITIVITY</span>
             <div class="slider-wrapper">
-              <input type="range" id="waveformInterval" min="50" max="2000" step="10" value="100">
+              <input type="range" id="waveformSensitivity" min="0" max="100" step="1" value="50">
             </div>
-            <span class="slider-value" id="waveformIntervalValue">100</span>
+            <span class="slider-value" id="waveformSensitivityValue">50</span>
           </div>
         </div>
       </div>
@@ -1358,15 +1358,16 @@
     let rippleTime = 0;
 
     // Waveform state
-    let waveformAmplitude = 0.8; // Height scale for waveform (higher peaks)
-    let waveformInterval = 100;   // Milliseconds between each waveform launch
-    let waveformScrollRate = 30;  // Milliseconds between each scroll step (~33 rows/sec)
-    let waveformThickness = 10;   // Number of rows each wave persists
-    let lastWaveformUpdate = 0;   // Timestamp of last cycle start
-    let lastScrollUpdate = 0;     // Timestamp of last scroll step
-    let currentWaveData = null;   // Cached waveform data
-    let waveRowsRemaining = 0;    // Rows left to fill with current wave
-    let midpointCaptured = false; // Whether we've captured waveform at midpoint this cycle
+    let waveformAmplitude = 0.8;   // Height scale for waveform (higher peaks)
+    let waveformScrollRate = 30;   // Milliseconds between each scroll step (~33 rows/sec)
+    let lastScrollUpdate = 0;      // Timestamp of last scroll step
+    let currentWaveData = null;    // Cached waveform data
+
+    // Transient detection state
+    let previousRMS = 0;           // Previous frame's RMS level
+    let transientThreshold = 0.26; // Sensitivity - maps from slider 50 (0.5 - 0.24)
+    let transientCooldown = 150;   // Minimum ms between triggers
+    let lastTransientTime = 0;     // Timestamp of last trigger
 
     // Palette time (independent of ripple)
     let paletteTime = 0;
@@ -1401,7 +1402,7 @@
       paletteEnabled: true, speed: 0.5, frequency: 4, intensity: 2.5, strength: 2.5,
       patternType: 'ripple',
       rippleEnabled: true, rippleFreq: 13.5, rippleAmplitude: 0.05, rippleSpeed: 0.05,
-      waveformAmplitude: 0.8, waveformInterval: 100,
+      waveformAmplitude: 0.8, waveformSensitivity: 50,
       imageVisible: true, wireframeEnabled: false,
       bloomEnabled: true, bloomIntensity: 7.5, bloomThreshold: 5,
       blurEnabled: true, blurStrength: 5,
@@ -1742,46 +1743,35 @@
       const finalAmp = Math.min(baseAmp + (audioLevel * audioMultiplier), maxAmplitude);
 
       // Update waveform displacement buffer if in waveform mode
-      // Scroll at fixed rate, smooth fade envelope between wave launches
+      // Transient detection: trigger on sudden amplitude increases
       if (patternType === 'waveform') {
         const now = Date.now();
         const shouldScroll = (now - lastScrollUpdate >= waveformScrollRate);
 
         if (shouldScroll) {
-          // Start new cycle when interval elapsed (do this FIRST)
-          if (now - lastWaveformUpdate >= waveformInterval) {
-            lastWaveformUpdate = now;
-            midpointCaptured = false; // Reset for new cycle
-          }
+          // Get current audio level and calculate delta
+          const currentRMS = audioAnalyzer.getAmplitude();
+          const delta = currentRMS - previousRMS;
+          previousRMS = currentRMS;
 
-          // Calculate cycle progress AFTER potential reset
-          const timeSinceCycleStart = now - lastWaveformUpdate;
-          const cycleProgress = Math.min(timeSinceCycleStart / waveformInterval, 1);
+          // Detect transient (sudden amplitude increase)
+          const cooldownElapsed = (now - lastTransientTime >= transientCooldown);
+          const isTransient = delta > transientThreshold && cooldownElapsed;
 
-          // Capture new waveform at midpoint (when fade = 0, invisible)
-          if (cycleProgress >= 0.5 && !midpointCaptured) {
+          if (isTransient) {
+            // Capture new waveform on transient
             currentWaveData = audioAnalyzer.getTimeDomainData();
             if (currentWaveData) {
-              currentWaveData = new Uint8Array(currentWaveData); // Copy the data
+              currentWaveData = new Uint8Array(currentWaveData);
             }
-            midpointCaptured = true;
+            lastTransientTime = now;
           }
 
-          // Calculate asymmetric fade multiplier
-          // First half: fast cosine fade-out (1 → 0)
-          // Second half: slow ease-in (0 → 1)
-          let fadeMultiplier;
-          if (cycleProgress < 0.5) {
-            // Fast fade-out: cosine from 1 to 0
-            const t = cycleProgress * 2; // 0 to 1 over first half
-            fadeMultiplier = (1 + Math.cos(Math.PI * t)) / 2;
-          } else {
-            // Slow ease-in: quadratic from 0 to 1
-            const t = (cycleProgress - 0.5) * 2; // 0 to 1 over second half
-            fadeMultiplier = t * t; // Starts slow, accelerates
-          }
+          // Calculate fade (decay after transient) - 1 second decay
+          const timeSinceTransient = now - lastTransientTime;
+          const fadeMultiplier = Math.max(0, 1 - (timeSinceTransient / 1000));
 
-          // Apply stored waveform snapshot with fade (not live audio)
+          // Apply waveform with fade
           updateWaveformDisplacement(currentWaveData, fadeMultiplier);
           smoothWaveformBuffer();
           geometry.attributes.displacement.needsUpdate = true;
@@ -1873,7 +1863,20 @@
 
     // Waveform sliders
     setupSlider('waveformAmplitude', v => waveformAmplitude = v);
-    setupSlider('waveformInterval', v => waveformInterval = v, 0);
+
+    // Sensitivity slider (inverted: higher slider = lower threshold = more triggers)
+    const sensitivitySlider = document.getElementById('waveformSensitivity');
+    const sensitivityValue = document.getElementById('waveformSensitivityValue');
+    if (sensitivitySlider) {
+      sensitivitySlider.addEventListener('input', (e) => {
+        const sliderValue = parseFloat(e.target.value);
+        // Map 0-100 to 0.5-0.02 (inverted)
+        transientThreshold = 0.5 - (sliderValue / 100) * 0.48;
+        sensitivityValue.textContent = sliderValue;
+        updateSliderFill(sensitivitySlider);
+      });
+      updateSliderFill(sensitivitySlider);
+    }
 
     // Post-processing sliders
     setupSlider('bloomIntensity', v => bloomIntensity = v, 1);
@@ -2090,19 +2093,21 @@
 
       // Reset waveform
       waveformAmplitude = defaults.waveformAmplitude;
-      waveformInterval = defaults.waveformInterval;
+      const sensitivityDefault = defaults.waveformSensitivity;
+      // Map slider value to threshold (inverted)
+      transientThreshold = 0.5 - (sensitivityDefault / 100) * 0.48;
 
       const waveformAmplitudeSlider = document.getElementById('waveformAmplitude');
-      const waveformIntervalSlider = document.getElementById('waveformInterval');
+      const waveformSensitivitySlider = document.getElementById('waveformSensitivity');
 
       waveformAmplitudeSlider.value = waveformAmplitude;
-      waveformIntervalSlider.value = waveformInterval;
+      waveformSensitivitySlider.value = sensitivityDefault;
 
       updateSliderFill(waveformAmplitudeSlider);
-      updateSliderFill(waveformIntervalSlider);
+      updateSliderFill(waveformSensitivitySlider);
 
       document.getElementById('waveformAmplitudeValue').textContent = waveformAmplitude.toFixed(2);
-      document.getElementById('waveformIntervalValue').textContent = waveformInterval;
+      document.getElementById('waveformSensitivityValue').textContent = sensitivityDefault;
 
       // Clear waveform history buffer
       if (waveformHistory) {
