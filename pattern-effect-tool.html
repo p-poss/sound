@@ -461,12 +461,6 @@
         <span class="arrow"></span>
       </div>
       <div class="section-content">
-        <div class="row row-option active" data-effect="ripple">
-          <div class="row-inner">
-            <span class="label">ENABLED</span>
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </div>
-        </div>
         <div class="row row-option active" data-effect="image">
           <div class="row-inner">
             <span class="label">IMAGE</span>
@@ -479,7 +473,19 @@
             <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
           </div>
         </div>
-        <div class="row row-slider">
+        <div class="row row-option active" data-effect="pattern-ripple">
+          <div class="row-inner">
+            <span class="label">RIPPLE</span>
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </div>
+        </div>
+        <div class="row row-option" data-effect="pattern-waveform">
+          <div class="row-inner">
+            <span class="label">WAVEFORM</span>
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </div>
+        </div>
+        <div class="row row-slider ripple-slider">
           <div class="row-inner">
             <span class="label">FREQUENCY</span>
             <div class="slider-wrapper">
@@ -488,7 +494,7 @@
             <span class="slider-value" id="rippleFreqValue">13.5</span>
           </div>
         </div>
-        <div class="row row-slider">
+        <div class="row row-slider ripple-slider">
           <div class="row-inner">
             <span class="label">AMPLITUDE</span>
             <div class="slider-wrapper">
@@ -497,13 +503,31 @@
             <span class="slider-value" id="rippleAmplitudeValue">0.05</span>
           </div>
         </div>
-        <div class="row row-slider">
+        <div class="row row-slider ripple-slider">
           <div class="row-inner">
             <span class="label">SPEED</span>
             <div class="slider-wrapper">
               <input type="range" id="rippleSpeed" min="0.01" max="0.10" step="0.01" value="0.05">
             </div>
             <span class="slider-value" id="rippleSpeedValue">0.05</span>
+          </div>
+        </div>
+        <div class="row row-slider waveform-slider" style="display: none;">
+          <div class="row-inner">
+            <span class="label">AMPLITUDE</span>
+            <div class="slider-wrapper">
+              <input type="range" id="waveformAmplitude" min="0.1" max="2.0" step="0.05" value="0.8">
+            </div>
+            <span class="slider-value" id="waveformAmplitudeValue">0.80</span>
+          </div>
+        </div>
+        <div class="row row-slider waveform-slider" style="display: none;">
+          <div class="row-inner">
+            <span class="label">INTERVAL</span>
+            <div class="slider-wrapper">
+              <input type="range" id="waveformInterval" min="50" max="2000" step="10" value="100">
+            </div>
+            <span class="slider-value" id="waveformIntervalValue">100</span>
           </div>
         </div>
       </div>
@@ -709,6 +733,8 @@
         this.audioElement = null;
         this.mediaStream = null;
         this.meydaAnalyzer = null;
+        this.analyser = null;           // Web Audio AnalyserNode for time-domain data
+        this.timeDomainData = null;     // Uint8Array for waveform samples
         this.isInitialized = false;
         this.sourceType = 'file';
         this.isPlaying = false;
@@ -740,6 +766,12 @@
         if (this.isInitialized) return;
 
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Create analyser for time-domain waveform data
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 256; // Gives 256 time-domain samples
+        this.timeDomainData = new Uint8Array(this.analyser.fftSize);
+
         this.isInitialized = true;
       }
 
@@ -815,7 +847,9 @@
         this.audioElement.src = url;
 
         this.source = this.audioContext.createMediaElementSource(this.audioElement);
-        this.source.connect(this.audioContext.destination);
+        // Connect through analyser for time-domain data
+        this.source.connect(this.analyser);
+        this.analyser.connect(this.audioContext.destination);
 
         this.setupMeydaAnalyzer();
         this.sourceType = 'file';
@@ -834,6 +868,8 @@
         try {
           this.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
           this.source = this.audioContext.createMediaStreamSource(this.mediaStream);
+          // Connect to analyser for time-domain data (no destination for mic)
+          this.source.connect(this.analyser);
 
           this.setupMeydaAnalyzer();
           this.sourceType = 'mic';
@@ -899,6 +935,14 @@
         return this.currentAmplitude || this.defaultAmplitude;
       }
 
+      getTimeDomainData() {
+        if (!this.analyser || !this.timeDomainData) return null;
+        if (!this.isPlaying && this.sourceType === 'file') return null;
+
+        this.analyser.getByteTimeDomainData(this.timeDomainData);
+        return this.timeDomainData; // Uint8Array, values 0-255, 128 = silence
+      }
+
       dispose() {
         this.disconnectSource();
         if (this.audioContext) {
@@ -908,7 +952,7 @@
     }
 
     // =====================================================
-    // Vertex Shader (with ripple displacement)
+    // Vertex Shader (with ripple/waveform displacement)
     // =====================================================
     const vertexShaderSource = `
       #define PI 3.14159265359
@@ -921,22 +965,42 @@
       uniform float uRippleFreq;
       uniform float uRippleProgress;
       uniform float uHoverProgress;
+      uniform int uPatternType;      // 0 = ripple, 1 = waveform
+      uniform float uWaveformScale;  // Scale factor for waveform displacement
+
+      attribute float displacement;  // Per-vertex displacement for waveform
 
       void main() {
         vec3 pos = position;
+        float effectDisplacement = 0.0;
 
-        // Ripple from center (0.5, 0.5)
-        float dist = distance(uv, vec2(0.5, 0.5));
-        float decay = clamp(dist, 8.0, 10.0);
-        float ripple = sin(-PI * uRippleFreq * dist + uTime) * (uAmplitude / decay);
-        ripple *= uRippleProgress * uHoverProgress;
+        // Corner pinning mask: smooth falloff from 1.0 at center to 0.0 at corners
+        float cornerDist = min(
+          min(distance(uv, vec2(0.0, 0.0)), distance(uv, vec2(1.0, 0.0))),
+          min(distance(uv, vec2(0.0, 1.0)), distance(uv, vec2(1.0, 1.0)))
+        );
+        float cornerMask = smoothstep(0.0, 0.15, cornerDist);
+
+        if (uPatternType == 0) {
+          // RIPPLE: Radial from center
+          float dist = distance(uv, vec2(0.5, 0.5));
+          float decay = clamp(dist, 8.0, 10.0);
+          effectDisplacement = sin(-PI * uRippleFreq * dist + uTime) * (uAmplitude / decay);
+          effectDisplacement *= uRippleProgress * uHoverProgress;
+        } else {
+          // WAVEFORM: Use per-vertex displacement attribute
+          effectDisplacement = displacement * uWaveformScale * uHoverProgress;
+        }
+
+        // Apply corner pinning mask
+        effectDisplacement *= cornerMask;
 
         // Displace Y position for visible warping (not Z)
-        pos.y += ripple;
+        pos.y += effectDisplacement;
 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
         vUv = uv;
-        vRipple = ripple;
+        vRipple = effectDisplacement;
       }
     `;
 
@@ -1250,6 +1314,11 @@
     // Create geometry with high subdivision for smooth ripple
     const geometry = new THREE.PlaneGeometry(1, 1, 100, 100);
 
+    // Initialize waveform displacement attribute (101x101 = 10201 vertices)
+    const vertexCount = geometry.attributes.position.count;
+    let waveformHistory = new Float32Array(vertexCount);
+    geometry.setAttribute('displacement', new THREE.BufferAttribute(waveformHistory, 1));
+
     // Image display settings
     const maxImageWidth = 600;  // Max width like index8
     const imageAspectRatio = 4 / 3;  // Default aspect ratio
@@ -1278,12 +1347,26 @@
     const hueStart = 0.0;
     const hueRange = 1.0;
 
+    // Pattern type state
+    let patternType = 'ripple'; // 'ripple' or 'waveform'
+
     // Ripple state
     let rippleEnabled = true;
     let rippleFreq = 13.5;
     let rippleAmplitude = 0.05;
     let rippleSpeed = 0.05;
     let rippleTime = 0;
+
+    // Waveform state
+    let waveformAmplitude = 0.8; // Height scale for waveform (higher peaks)
+    let waveformInterval = 100;   // Milliseconds between each waveform launch
+    let waveformScrollRate = 30;  // Milliseconds between each scroll step (~33 rows/sec)
+    let waveformThickness = 10;   // Number of rows each wave persists
+    let lastWaveformUpdate = 0;   // Timestamp of last cycle start
+    let lastScrollUpdate = 0;     // Timestamp of last scroll step
+    let currentWaveData = null;   // Cached waveform data
+    let waveRowsRemaining = 0;    // Rows left to fill with current wave
+    let midpointCaptured = false; // Whether we've captured waveform at midpoint this cycle
 
     // Palette time (independent of ripple)
     let paletteTime = 0;
@@ -1316,7 +1399,9 @@
     // Default values for reset
     const defaults = {
       paletteEnabled: true, speed: 0.5, frequency: 4, intensity: 2.5, strength: 2.5,
+      patternType: 'ripple',
       rippleEnabled: true, rippleFreq: 13.5, rippleAmplitude: 0.05, rippleSpeed: 0.05,
+      waveformAmplitude: 0.8, waveformInterval: 100,
       imageVisible: true, wireframeEnabled: false,
       bloomEnabled: true, bloomIntensity: 7.5, bloomThreshold: 5,
       blurEnabled: true, blurStrength: 5,
@@ -1355,7 +1440,9 @@
           uGrainScale: { value: grainScale },
           uGrainAnimated: { value: grainAnimated },
           uGrainSpeed: { value: grainSpeed },
-          uHoverProgress: { value: hoverProgress }
+          uHoverProgress: { value: hoverProgress },
+          uPatternType: { value: 0 },
+          uWaveformScale: { value: waveformAmplitude }
         }
       });
     }
@@ -1391,7 +1478,9 @@
           uAmplitude: { value: rippleAmplitude },
           uRippleFreq: { value: rippleFreq },
           uRippleProgress: { value: 0 },
-          uHoverProgress: { value: hoverProgress }
+          uHoverProgress: { value: hoverProgress },
+          uPatternType: { value: 0 },
+          uWaveformScale: { value: waveformAmplitude }
         }
       });
     }
@@ -1501,6 +1590,86 @@
 
     window.addEventListener('resize', resize);
 
+    // Waveform displacement buffer management
+    function updateWaveformDisplacement(timeDomainData, fadeMultiplier = 1) {
+      if (!waveformHistory || !mesh || patternType !== 'waveform') return;
+      if (!timeDomainData) return;
+
+      const cols = 101;  // Vertices per row (100 segments + 1)
+      const rows = 101;  // Total rows
+      const samples = timeDomainData.length; // 256 samples
+
+      // Shift all rows up by 1 row (bottom to top scrolling)
+      waveformHistory.copyWithin(0, cols);
+
+      // Fill the bottom row with the new waveform data, scaled by fadeMultiplier
+      const startIdx = (rows - 1) * cols;
+      for (let i = 0; i < cols; i++) {
+        // Map column index to sample index
+        const sampleIdx = Math.floor((i / (cols - 1)) * (samples - 1));
+        // Convert 0-255 to -1 to +1, then scale by amplitude and fade
+        const sample = (timeDomainData[sampleIdx] - 128) / 128;
+        waveformHistory[startIdx + i] = sample * waveformAmplitude * fadeMultiplier;
+      }
+
+      // Update the geometry attribute
+      geometry.attributes.displacement.needsUpdate = true;
+    }
+
+    // Shift waveform without adding new data (for continuous scrolling)
+    function shiftWaveformOnly() {
+      if (!waveformHistory || !mesh || patternType !== 'waveform') return;
+
+      const cols = 101;
+      const rows = 101;
+
+      // Shift all rows up by 1
+      waveformHistory.copyWithin(0, cols);
+
+      // Fill bottom row with zeros (flat/silence)
+      const startIdx = (rows - 1) * cols;
+      for (let i = 0; i < cols; i++) {
+        waveformHistory[startIdx + i] = 0;
+      }
+
+      geometry.attributes.displacement.needsUpdate = true;
+    }
+
+    // Apply 3x3 box blur smoothing to waveform buffer (for smooth terrain)
+    function smoothWaveformBuffer() {
+      if (!waveformHistory) return;
+
+      const cols = 101;
+      const rows = 101;
+      const temp = new Float32Array(waveformHistory.length);
+
+      // 3x3 box blur (skip edges)
+      for (let z = 1; z < rows - 1; z++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const i = z * cols + x;
+          temp[i] = (
+            waveformHistory[i - cols - 1] + waveformHistory[i - cols] + waveformHistory[i - cols + 1] +
+            waveformHistory[i - 1] + waveformHistory[i] + waveformHistory[i + 1] +
+            waveformHistory[i + cols - 1] + waveformHistory[i + cols] + waveformHistory[i + cols + 1]
+          ) / 9;
+        }
+      }
+
+      // Copy smoothed values back (preserve edges)
+      for (let z = 1; z < rows - 1; z++) {
+        for (let x = 1; x < cols - 1; x++) {
+          const i = z * cols + x;
+          waveformHistory[i] = temp[i];
+        }
+      }
+
+      // Zero out edge columns to keep corners/sides flat
+      for (let z = 0; z < rows; z++) {
+        waveformHistory[z * cols] = 0;           // Left edge (x=0)
+        waveformHistory[z * cols + cols - 1] = 0; // Right edge (x=100)
+      }
+    }
+
     // Animation loop
     let startTime = Date.now();
 
@@ -1548,6 +1717,55 @@
       const baseAmp = rippleAmplitude;
       const finalAmp = Math.min(baseAmp + (audioLevel * audioMultiplier), maxAmplitude);
 
+      // Update waveform displacement buffer if in waveform mode
+      // Scroll at fixed rate, smooth fade envelope between wave launches
+      if (patternType === 'waveform') {
+        const now = Date.now();
+        const shouldScroll = (now - lastScrollUpdate >= waveformScrollRate);
+
+        if (shouldScroll) {
+          // Start new cycle when interval elapsed (do this FIRST)
+          if (now - lastWaveformUpdate >= waveformInterval) {
+            lastWaveformUpdate = now;
+            midpointCaptured = false; // Reset for new cycle
+          }
+
+          // Calculate cycle progress AFTER potential reset
+          const timeSinceCycleStart = now - lastWaveformUpdate;
+          const cycleProgress = Math.min(timeSinceCycleStart / waveformInterval, 1);
+
+          // Capture new waveform at midpoint (when fade = 0, invisible)
+          if (cycleProgress >= 0.5 && !midpointCaptured) {
+            currentWaveData = audioAnalyzer.getTimeDomainData();
+            if (currentWaveData) {
+              currentWaveData = new Uint8Array(currentWaveData); // Copy the data
+            }
+            midpointCaptured = true;
+          }
+
+          // Calculate asymmetric fade multiplier
+          // First half: fast cosine fade-out (1 → 0)
+          // Second half: slow ease-in (0 → 1)
+          let fadeMultiplier;
+          if (cycleProgress < 0.5) {
+            // Fast fade-out: cosine from 1 to 0
+            const t = cycleProgress * 2; // 0 to 1 over first half
+            fadeMultiplier = (1 + Math.cos(Math.PI * t)) / 2;
+          } else {
+            // Slow ease-in: quadratic from 0 to 1
+            const t = (cycleProgress - 0.5) * 2; // 0 to 1 over second half
+            fadeMultiplier = t * t; // Starts slow, accelerates
+          }
+
+          // Apply stored waveform snapshot with fade (not live audio)
+          updateWaveformDisplacement(currentWaveData, fadeMultiplier);
+          smoothWaveformBuffer();
+          geometry.attributes.displacement.needsUpdate = true;
+
+          lastScrollUpdate = now;
+        }
+      }
+
       // Update uniforms
       material.uniforms.uTime.value = rippleTime;
       material.uniforms.uPaletteTime.value = paletteTime;
@@ -1573,6 +1791,8 @@
       material.uniforms.uGrainAnimated.value = grainAnimated;
       material.uniforms.uGrainSpeed.value = grainSpeed;
       material.uniforms.uHoverProgress.value = hoverProgress;
+      material.uniforms.uPatternType.value = patternType === 'ripple' ? 0 : 1;
+      material.uniforms.uWaveformScale.value = waveformAmplitude;
 
       // Sync wireframe uniforms
       if (wireframeMaterial) {
@@ -1581,6 +1801,8 @@
         wireframeMaterial.uniforms.uRippleFreq.value = rippleFreq;
         wireframeMaterial.uniforms.uRippleProgress.value = rippleEnabled ? 1.0 : 0.0;
         wireframeMaterial.uniforms.uHoverProgress.value = hoverProgress;
+        wireframeMaterial.uniforms.uPatternType.value = patternType === 'ripple' ? 0 : 1;
+        wireframeMaterial.uniforms.uWaveformScale.value = waveformAmplitude;
       }
 
       renderer.render(scene, camera);
@@ -1625,6 +1847,10 @@
     setupSlider('rippleAmplitude', v => rippleAmplitude = v);
     setupSlider('rippleSpeed', v => rippleSpeed = v);
 
+    // Waveform sliders
+    setupSlider('waveformAmplitude', v => waveformAmplitude = v);
+    setupSlider('waveformInterval', v => waveformInterval = v, 0);
+
     // Post-processing sliders
     setupSlider('bloomIntensity', v => bloomIntensity = v, 1);
     setupSlider('bloomThreshold', v => bloomThreshold = v, 1);
@@ -1635,14 +1861,33 @@
     setupSlider('grainScale', v => grainScale = v, 3);
     setupSlider('grainSpeed', v => grainSpeed = v, 3);
 
-    // Effect toggles (ripple, palette, bloom, blur, wireframe)
+    // Helper function to toggle pattern slider visibility
+    function togglePatternSliders(type) {
+      document.querySelectorAll('.ripple-slider').forEach(el => {
+        el.style.display = type === 'ripple' ? '' : 'none';
+      });
+      document.querySelectorAll('.waveform-slider').forEach(el => {
+        el.style.display = type === 'waveform' ? '' : 'none';
+      });
+    }
+
+    // Effect toggles (pattern, palette, bloom, blur, wireframe)
     document.querySelectorAll('[data-effect]').forEach(option => {
       option.addEventListener('click', () => {
         const effectName = option.dataset.effect;
 
-        if (effectName === 'ripple') {
-          rippleEnabled = !rippleEnabled;
-          option.classList.toggle('active', rippleEnabled);
+        if (effectName === 'pattern-ripple') {
+          patternType = 'ripple';
+          rippleEnabled = true;
+          document.querySelector('[data-effect="pattern-ripple"]').classList.add('active');
+          document.querySelector('[data-effect="pattern-waveform"]').classList.remove('active');
+          togglePatternSliders('ripple');
+        } else if (effectName === 'pattern-waveform') {
+          patternType = 'waveform';
+          rippleEnabled = true;
+          document.querySelector('[data-effect="pattern-waveform"]').classList.add('active');
+          document.querySelector('[data-effect="pattern-ripple"]').classList.remove('active');
+          togglePatternSliders('waveform');
         } else if (effectName === 'palette') {
           paletteEnabled = !paletteEnabled;
           option.classList.toggle('active', paletteEnabled);
@@ -1794,6 +2039,9 @@
       // Reset palette
       paletteEnabled = defaults.paletteEnabled;
 
+      // Reset pattern type
+      patternType = defaults.patternType;
+
       // Reset ripple
       rippleEnabled = defaults.rippleEnabled;
       rippleFreq = defaults.rippleFreq;
@@ -1815,6 +2063,33 @@
       document.getElementById('rippleFreqValue').textContent = rippleFreq.toFixed(1);
       document.getElementById('rippleAmplitudeValue').textContent = rippleAmplitude.toFixed(2);
       document.getElementById('rippleSpeedValue').textContent = rippleSpeed.toFixed(2);
+
+      // Reset waveform
+      waveformAmplitude = defaults.waveformAmplitude;
+      waveformInterval = defaults.waveformInterval;
+
+      const waveformAmplitudeSlider = document.getElementById('waveformAmplitude');
+      const waveformIntervalSlider = document.getElementById('waveformInterval');
+
+      waveformAmplitudeSlider.value = waveformAmplitude;
+      waveformIntervalSlider.value = waveformInterval;
+
+      updateSliderFill(waveformAmplitudeSlider);
+      updateSliderFill(waveformIntervalSlider);
+
+      document.getElementById('waveformAmplitudeValue').textContent = waveformAmplitude.toFixed(2);
+      document.getElementById('waveformIntervalValue').textContent = waveformInterval;
+
+      // Clear waveform history buffer
+      if (waveformHistory) {
+        waveformHistory.fill(0);
+        geometry.attributes.displacement.needsUpdate = true;
+      }
+
+      // Reset pattern UI
+      document.querySelector('[data-effect="pattern-ripple"]').classList.add('active');
+      document.querySelector('[data-effect="pattern-waveform"]').classList.remove('active');
+      togglePatternSliders('ripple');
 
       // Reset image visibility
       imageVisible = defaults.imageVisible;
@@ -1879,8 +2154,10 @@
         const effect = opt.dataset.effect;
         if (effect === 'palette') {
           opt.classList.toggle('active', defaults.paletteEnabled);
-        } else if (effect === 'ripple') {
-          opt.classList.toggle('active', defaults.rippleEnabled);
+        } else if (effect === 'pattern-ripple') {
+          opt.classList.toggle('active', defaults.patternType === 'ripple');
+        } else if (effect === 'pattern-waveform') {
+          opt.classList.toggle('active', defaults.patternType === 'waveform');
         } else if (effect === 'image') {
           opt.classList.toggle('active', defaults.imageVisible);
         } else if (effect === 'wireframe') {
