@@ -1590,26 +1590,50 @@
 
     window.addEventListener('resize', resize);
 
-    // Waveform displacement buffer management
+    // Waveform displacement buffer management - center launch with bidirectional scroll
     function updateWaveformDisplacement(timeDomainData, fadeMultiplier = 1) {
       if (!waveformHistory || !mesh || patternType !== 'waveform') return;
       if (!timeDomainData) return;
 
       const cols = 101;  // Vertices per row (100 segments + 1)
       const rows = 101;  // Total rows
+      const centerRow = 50;
       const samples = timeDomainData.length; // 256 samples
 
-      // Shift all rows up by 1 row (bottom to top scrolling)
-      waveformHistory.copyWithin(0, cols);
+      // Shift upper half UP (rows 0-49 shift toward row 0)
+      // Copy row 1 to row 0, row 2 to row 1, etc.
+      for (let z = 0; z < centerRow - 1; z++) {
+        const destIdx = z * cols;
+        const srcIdx = (z + 1) * cols;
+        for (let x = 0; x < cols; x++) {
+          waveformHistory[destIdx + x] = waveformHistory[srcIdx + x];
+        }
+      }
 
-      // Fill the bottom row with the new waveform data, scaled by fadeMultiplier
-      const startIdx = (rows - 1) * cols;
+      // Shift lower half DOWN (rows 51-100 shift toward row 100)
+      // Copy row 99 to row 100, row 98 to row 99, etc.
+      for (let z = rows - 1; z > centerRow + 1; z--) {
+        const destIdx = z * cols;
+        const srcIdx = (z - 1) * cols;
+        for (let x = 0; x < cols; x++) {
+          waveformHistory[destIdx + x] = waveformHistory[srcIdx + x];
+        }
+      }
+
+      // Write new waveform to center row (row 50)
+      const centerIdx = centerRow * cols;
       for (let i = 0; i < cols; i++) {
-        // Map column index to sample index
         const sampleIdx = Math.floor((i / (cols - 1)) * (samples - 1));
-        // Convert 0-255 to -1 to +1, then scale by amplitude and fade
         const sample = (timeDomainData[sampleIdx] - 128) / 128;
-        waveformHistory[startIdx + i] = sample * waveformAmplitude * fadeMultiplier;
+        waveformHistory[centerIdx + i] = sample * waveformAmplitude * fadeMultiplier;
+      }
+
+      // Also copy to adjacent rows for immediate spread (row 49 and 51)
+      const aboveIdx = (centerRow - 1) * cols;
+      const belowIdx = (centerRow + 1) * cols;
+      for (let i = 0; i < cols; i++) {
+        waveformHistory[aboveIdx + i] = waveformHistory[centerIdx + i];
+        waveformHistory[belowIdx + i] = waveformHistory[centerIdx + i];
       }
 
       // Update the geometry attribute
@@ -1663,7 +1687,7 @@
         }
       }
 
-      // Zero out edge columns to keep corners/sides flat
+      // Zero out left/right edges to keep sides flat
       for (let z = 0; z < rows; z++) {
         waveformHistory[z * cols] = 0;           // Left edge (x=0)
         waveformHistory[z * cols + cols - 1] = 0; // Right edge (x=100)
