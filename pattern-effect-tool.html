@@ -1591,50 +1591,48 @@
 
     window.addEventListener('resize', resize);
 
-    // Waveform displacement buffer management - center launch with bidirectional scroll
+    // Waveform displacement buffer management - bottom to top scrolling
     function updateWaveformDisplacement(timeDomainData, fadeMultiplier = 1) {
       if (!waveformHistory || !mesh || patternType !== 'waveform') return;
       if (!timeDomainData) return;
 
       const cols = 101;  // Vertices per row (100 segments + 1)
       const rows = 101;  // Total rows
-      const centerRow = 50;
       const samples = timeDomainData.length; // 256 samples
 
-      // Shift upper half UP (rows 0-49 shift toward row 0)
-      // Copy row 1 to row 0, row 2 to row 1, etc.
-      for (let z = 0; z < centerRow - 1; z++) {
-        const destIdx = z * cols;
-        const srcIdx = (z + 1) * cols;
-        for (let x = 0; x < cols; x++) {
-          waveformHistory[destIdx + x] = waveformHistory[srcIdx + x];
-        }
-      }
+      // Shift all rows up by 1 row (bottom to top scrolling)
+      waveformHistory.copyWithin(0, cols);
 
-      // Shift lower half DOWN (rows 51-100 shift toward row 100)
-      // Copy row 99 to row 100, row 98 to row 99, etc.
-      for (let z = rows - 1; z > centerRow + 1; z--) {
-        const destIdx = z * cols;
-        const srcIdx = (z - 1) * cols;
-        for (let x = 0; x < cols; x++) {
-          waveformHistory[destIdx + x] = waveformHistory[srcIdx + x];
-        }
-      }
+      // Fill the bottom row with pre-smoothed waveform data
+      const startIdx = (rows - 1) * cols;
 
-      // Write new waveform to center row (row 50)
-      const centerIdx = centerRow * cols;
+      // Sample the raw waveform
+      let wave = new Float32Array(cols);
       for (let i = 0; i < cols; i++) {
         const sampleIdx = Math.floor((i / (cols - 1)) * (samples - 1));
-        const sample = (timeDomainData[sampleIdx] - 128) / 128;
-        waveformHistory[centerIdx + i] = sample * waveformAmplitude * fadeMultiplier;
+        wave[i] = (timeDomainData[sampleIdx] - 128) / 128;
       }
 
-      // Also copy to adjacent rows for immediate spread (row 49 and 51)
-      const aboveIdx = (centerRow - 1) * cols;
-      const belowIdx = (centerRow + 1) * cols;
+      // Apply 5-point horizontal smoothing, multiple passes
+      const smoothPasses = 3;
+      let temp = new Float32Array(cols);
+      for (let pass = 0; pass < smoothPasses; pass++) {
+        for (let i = 0; i < cols; i++) {
+          const i2 = Math.max(0, i - 2);
+          const i1 = Math.max(0, i - 1);
+          const i3 = Math.min(cols - 1, i + 1);
+          const i4 = Math.min(cols - 1, i + 2);
+          temp[i] = (wave[i2] + wave[i1] + wave[i] + wave[i3] + wave[i4]) / 5;
+        }
+        // Swap buffers
+        const swap = wave;
+        wave = temp;
+        temp = swap;
+      }
+
+      // Write smoothed waveform to buffer
       for (let i = 0; i < cols; i++) {
-        waveformHistory[aboveIdx + i] = waveformHistory[centerIdx + i];
-        waveformHistory[belowIdx + i] = waveformHistory[centerIdx + i];
+        waveformHistory[startIdx + i] = wave[i] * waveformAmplitude * fadeMultiplier;
       }
 
       // Update the geometry attribute
