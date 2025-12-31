@@ -512,6 +512,12 @@
             <span class="slider-value" id="rippleSpeedValue">0.05</span>
           </div>
         </div>
+        <div class="row row-option ripple-slider" data-effect="ripple-edge-damping">
+          <div class="row-inner">
+            <span class="label">EDGE DAMPING</span>
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </div>
+        </div>
         <div class="row row-slider waveform-slider" style="display: none;">
           <div class="row-inner">
             <span class="label">AMPLITUDE</span>
@@ -977,6 +983,7 @@
       uniform int uPatternType;      // 0 = ripple, 1 = waveform
       uniform float uWaveformScale;  // Scale factor for waveform displacement
       uniform int uWaveformDir;      // 0 = horizontal (X displacement), 1 = vertical (Y displacement)
+      uniform float uEdgeDamping;    // 1.0 = horizontal edge damping, 0.0 = corner pinning
 
       attribute float displacement;  // Per-vertex displacement for waveform
 
@@ -991,19 +998,29 @@
         );
         float cornerMask = smoothstep(0.0, 0.15, cornerDist);
 
+        // Horizontal edge damping mask: smooth gradient to 0 at left/right edges, free at top/bottom
+        float edgeMask = smoothstep(0.0, 0.15, uv.x) * smoothstep(0.0, 0.15, 1.0 - uv.x);
+
         if (uPatternType == 0) {
           // RIPPLE: Radial from center
           float dist = distance(uv, vec2(0.5, 0.5));
           float decay = clamp(dist, 8.0, 10.0);
           effectDisplacement = sin(-PI * uRippleFreq * dist + uTime) * (uAmplitude / decay);
           effectDisplacement *= uRippleProgress * uHoverProgress;
+
+          // Apply edge damping or corner pinning based on toggle
+          if (uEdgeDamping > 0.5) {
+            effectDisplacement *= edgeMask;
+          } else {
+            effectDisplacement *= cornerMask;
+          }
         } else {
           // WAVEFORM: Use per-vertex displacement attribute
           effectDisplacement = displacement * uWaveformScale * uHoverProgress;
-        }
 
-        // Apply corner pinning mask
-        effectDisplacement *= cornerMask;
+          // Waveform always uses corner pinning
+          effectDisplacement *= cornerMask;
+        }
 
         // Displace position based on pattern type and direction
         if (uPatternType == 0) {
@@ -1378,6 +1395,7 @@
     let rippleAmplitude = 0.05;
     let rippleSpeed = 0.05;
     let rippleTime = 0;
+    let rippleEdgeDamping = false;
 
     // Waveform state
     let waveformAmplitude = 0.8;   // Height scale for waveform (higher peaks)
@@ -1424,7 +1442,7 @@
     const defaults = {
       paletteEnabled: true, speed: 0.5, frequency: 4, intensity: 2.5, strength: 2.5,
       patternType: 'ripple',
-      rippleEnabled: true, rippleFreq: 13.5, rippleAmplitude: 0.05, rippleSpeed: 0.05,
+      rippleEnabled: true, rippleFreq: 13.5, rippleAmplitude: 0.05, rippleSpeed: 0.05, rippleEdgeDamping: false,
       waveformAmplitude: 0.8, waveformSensitivity: 50, waveformDirection: 'left-to-right',
       imageVisible: true, wireframeEnabled: false,
       bloomEnabled: true, bloomIntensity: 7.5, bloomThreshold: 5,
@@ -1467,7 +1485,8 @@
           uHoverProgress: { value: hoverProgress },
           uPatternType: { value: 0 },
           uWaveformScale: { value: waveformAmplitude },
-          uWaveformDir: { value: 0 }
+          uWaveformDir: { value: 0 },
+          uEdgeDamping: { value: 0.0 }
         }
       });
     }
@@ -1506,7 +1525,8 @@
           uHoverProgress: { value: hoverProgress },
           uPatternType: { value: 0 },
           uWaveformScale: { value: waveformAmplitude },
-          uWaveformDir: { value: 0 }
+          uWaveformDir: { value: 0 },
+          uEdgeDamping: { value: 0.0 }
         }
       });
     }
@@ -1894,6 +1914,7 @@
       material.uniforms.uPatternType.value = patternType === 'ripple' ? 0 : 1;
       material.uniforms.uWaveformScale.value = waveformAmplitude;
       material.uniforms.uWaveformDir.value = (waveformDirection === 'left-to-right' || waveformDirection === 'right-to-left') ? 0 : 1;
+      material.uniforms.uEdgeDamping.value = rippleEdgeDamping ? 1.0 : 0.0;
 
       // Sync wireframe uniforms
       if (wireframeMaterial) {
@@ -1905,6 +1926,7 @@
         wireframeMaterial.uniforms.uPatternType.value = patternType === 'ripple' ? 0 : 1;
         wireframeMaterial.uniforms.uWaveformScale.value = waveformAmplitude;
         wireframeMaterial.uniforms.uWaveformDir.value = (waveformDirection === 'left-to-right' || waveformDirection === 'right-to-left') ? 0 : 1;
+        wireframeMaterial.uniforms.uEdgeDamping.value = rippleEdgeDamping ? 1.0 : 0.0;
       }
 
       renderer.render(scene, camera);
@@ -2043,6 +2065,9 @@
         } else if (effectName === 'grainAnimated') {
           grainAnimated = !grainAnimated;
           option.classList.toggle('active', grainAnimated);
+        } else if (effectName === 'ripple-edge-damping') {
+          rippleEdgeDamping = !rippleEdgeDamping;
+          option.classList.toggle('active', rippleEdgeDamping);
         }
       });
     });
@@ -2175,6 +2200,7 @@
       rippleFreq = defaults.rippleFreq;
       rippleAmplitude = defaults.rippleAmplitude;
       rippleSpeed = defaults.rippleSpeed;
+      rippleEdgeDamping = defaults.rippleEdgeDamping;
 
       const rippleFreqSlider = document.getElementById('rippleFreq');
       const rippleAmplitudeSlider = document.getElementById('rippleAmplitude');
@@ -2225,6 +2251,7 @@
       // Reset pattern UI
       document.querySelector('[data-effect="pattern-ripple"]').classList.add('active');
       document.querySelector('[data-effect="pattern-waveform"]').classList.remove('active');
+      document.querySelector('[data-effect="ripple-edge-damping"]').classList.toggle('active', defaults.rippleEdgeDamping);
       togglePatternSliders('ripple');
 
       // Reset image visibility
