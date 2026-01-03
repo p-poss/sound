@@ -103,30 +103,34 @@
       gap: 8px;
     }
 
-    .row-header .toggle-btn {
-      width: 28px;
-      height: 28px;
-      border: none;
-      border-radius: 3px;
-      background: rgba(0,0,0,0.35);
-      cursor: pointer;
+    .row-header .toggle-buttons {
       display: flex;
-      align-items: center;
-      justify-content: center;
+      gap: 1px;
+      background: rgba(0,0,0,0.35);
+      border-radius: 3px;
+      padding: 4px;
+    }
+
+    .row-header .toggle-opt {
+      padding: 4px 8px;
+      border: none;
+      border-radius: 2px;
+      background: transparent;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: -0.25px;
+      line-height: 1;
+      cursor: pointer;
       transition: background 0.15s ease;
     }
 
-    .row-header .toggle-btn:hover {
-      background: rgba(0,0,0,0.5);
+    .row-header .toggle-opt:hover {
+      background: rgba(255,255,255,0.15);
     }
 
-    .row-header .toggle-btn .check {
-      opacity: 0.3;
-      transition: opacity 0.15s ease;
-    }
-
-    .row-header .toggle-btn.active .check {
-      opacity: 1;
+    .row-header .toggle-opt.active {
+      background: rgba(255,255,255,0.25);
     }
 
     .section-content {
@@ -635,9 +639,10 @@
       <div class="row row-header">
         <span class="label">PATTERN</span>
         <div class="header-right">
-          <button class="toggle-btn active" data-effect="pattern">
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </button>
+          <div class="toggle-buttons">
+            <button class="toggle-opt active" data-toggle="pattern" data-value="on">ON</button>
+            <button class="toggle-opt" data-toggle="pattern" data-value="off">OFF</button>
+          </div>
           <span class="arrow"></span>
         </div>
       </div>
@@ -721,9 +726,10 @@
       <div class="row row-header">
         <span class="label">PALETTE</span>
         <div class="header-right">
-          <button class="toggle-btn active" data-effect="palette">
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </button>
+          <div class="toggle-buttons">
+            <button class="toggle-opt active" data-toggle="palette" data-value="on">ON</button>
+            <button class="toggle-opt" data-toggle="palette" data-value="off">OFF</button>
+          </div>
           <span class="arrow"></span>
         </div>
       </div>
@@ -771,9 +777,10 @@
       <div class="row row-header">
         <span class="label">BLOOM</span>
         <div class="header-right">
-          <button class="toggle-btn active" data-effect="bloom">
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </button>
+          <div class="toggle-buttons">
+            <button class="toggle-opt active" data-toggle="bloom" data-value="on">ON</button>
+            <button class="toggle-opt" data-toggle="bloom" data-value="off">OFF</button>
+          </div>
           <span class="arrow"></span>
         </div>
       </div>
@@ -803,9 +810,10 @@
       <div class="row row-header">
         <span class="label">BLUR</span>
         <div class="header-right">
-          <button class="toggle-btn active" data-effect="blur">
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </button>
+          <div class="toggle-buttons">
+            <button class="toggle-opt active" data-toggle="blur" data-value="on">ON</button>
+            <button class="toggle-opt" data-toggle="blur" data-value="off">OFF</button>
+          </div>
           <span class="arrow"></span>
         </div>
       </div>
@@ -826,9 +834,10 @@
       <div class="row row-header">
         <span class="label">GRAIN</span>
         <div class="header-right">
-          <button class="toggle-btn active" data-effect="grain">
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </button>
+          <div class="toggle-buttons">
+            <button class="toggle-opt active" data-toggle="grain" data-value="on">ON</button>
+            <button class="toggle-opt" data-toggle="grain" data-value="off">OFF</button>
+          </div>
           <span class="arrow"></span>
         </div>
       </div>
@@ -2548,41 +2557,56 @@
       });
     }
 
-    // Effect toggles (pattern, palette, bloom, blur, wireframe)
+    // Header ON/OFF toggle buttons
+    document.querySelectorAll('[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent expand/collapse
+        const toggleName = btn.dataset.toggle;
+        const value = btn.dataset.value === 'on';
+
+        // Update button states
+        const container = btn.closest('.toggle-buttons');
+        container.querySelectorAll('.toggle-opt').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Update effect state
+        if (toggleName === 'pattern') {
+          rippleEnabled = value;
+        } else if (toggleName === 'palette') {
+          paletteEnabled = value;
+        } else if (toggleName === 'bloom') {
+          bloomEnabled = value;
+        } else if (toggleName === 'blur') {
+          blurEnabled = value;
+        } else if (toggleName === 'grain') {
+          grainEnabled = value;
+        }
+      });
+    });
+
+    // Effect toggles (pattern type, image, wireframe, etc.)
     document.querySelectorAll('[data-effect]').forEach(option => {
       option.addEventListener('click', (e) => {
-        // Stop propagation for header toggle buttons to prevent expand/collapse
-        if (option.classList.contains('toggle-btn')) {
-          e.stopPropagation();
-        }
         const effectName = option.dataset.effect;
 
-        if (effectName === 'pattern') {
-          rippleEnabled = !rippleEnabled;
-          option.classList.toggle('active', rippleEnabled);
-        } else if (effectName === 'pattern-ripple') {
+        if (effectName === 'pattern-ripple') {
           patternType = 'ripple';
           rippleEnabled = true;
           document.querySelector('[data-effect="pattern-ripple"]').classList.add('active');
           document.querySelector('[data-effect="pattern-waveform"]').classList.remove('active');
-          document.querySelector('[data-effect="pattern"]').classList.add('active');
+          // Update toggle to ON
+          document.querySelector('[data-toggle="pattern"][data-value="on"]').classList.add('active');
+          document.querySelector('[data-toggle="pattern"][data-value="off"]').classList.remove('active');
           togglePatternSliders('ripple');
         } else if (effectName === 'pattern-waveform') {
           patternType = 'waveform';
           rippleEnabled = true;
           document.querySelector('[data-effect="pattern-waveform"]').classList.add('active');
           document.querySelector('[data-effect="pattern-ripple"]').classList.remove('active');
-          document.querySelector('[data-effect="pattern"]').classList.add('active');
+          // Update toggle to ON
+          document.querySelector('[data-toggle="pattern"][data-value="on"]').classList.add('active');
+          document.querySelector('[data-toggle="pattern"][data-value="off"]').classList.remove('active');
           togglePatternSliders('waveform');
-        } else if (effectName === 'palette') {
-          paletteEnabled = !paletteEnabled;
-          option.classList.toggle('active', paletteEnabled);
-        } else if (effectName === 'bloom') {
-          bloomEnabled = !bloomEnabled;
-          option.classList.toggle('active', bloomEnabled);
-        } else if (effectName === 'blur') {
-          blurEnabled = !blurEnabled;
-          option.classList.toggle('active', blurEnabled);
         } else if (effectName === 'image') {
           imageVisible = !imageVisible;
           option.classList.toggle('active', imageVisible);
@@ -2595,9 +2619,6 @@
           if (wireframeMesh) {
             wireframeMesh.visible = wireframeEnabled;
           }
-        } else if (effectName === 'grain') {
-          grainEnabled = !grainEnabled;
-          option.classList.toggle('active', grainEnabled);
         } else if (effectName === 'grainAnimated') {
           grainAnimated = !grainAnimated;
           option.classList.toggle('active', grainAnimated);
