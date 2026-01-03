@@ -97,6 +97,38 @@
       transform: rotate(-90deg);
     }
 
+    .row-header .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .row-header .toggle-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 3px;
+      background: rgba(0,0,0,0.35);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease;
+    }
+
+    .row-header .toggle-btn:hover {
+      background: rgba(0,0,0,0.5);
+    }
+
+    .row-header .toggle-btn .check {
+      opacity: 0.3;
+      transition: opacity 0.15s ease;
+    }
+
+    .row-header .toggle-btn.active .check {
+      opacity: 1;
+    }
+
     .section-content {
       display: flex;
       flex-direction: column;
@@ -683,15 +715,14 @@
     <div class="section collapsed">
       <div class="row row-header">
         <span class="label">PALETTE</span>
-        <span class="arrow"></span>
+        <div class="header-right">
+          <button class="toggle-btn active" data-effect="palette">
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </button>
+          <span class="arrow"></span>
+        </div>
       </div>
       <div class="section-content">
-        <div class="row row-option active" data-effect="palette">
-          <div class="row-inner">
-            <span class="label">ENABLED</span>
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </div>
-        </div>
         <div class="row row-slider">
           <div class="row-inner">
             <span class="label">SPEED</span>
@@ -734,15 +765,14 @@
     <div class="section collapsed">
       <div class="row row-header">
         <span class="label">BLOOM</span>
-        <span class="arrow"></span>
+        <div class="header-right">
+          <button class="toggle-btn active" data-effect="bloom">
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </button>
+          <span class="arrow"></span>
+        </div>
       </div>
       <div class="section-content">
-        <div class="row row-option active" data-effect="bloom">
-          <div class="row-inner">
-            <span class="label">ENABLED</span>
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </div>
-        </div>
         <div class="row row-slider" id="bloomIntensityRow">
           <div class="row-inner">
             <span class="label">INTENSITY</span>
@@ -767,15 +797,14 @@
     <div class="section collapsed">
       <div class="row row-header">
         <span class="label">BLUR</span>
-        <span class="arrow"></span>
+        <div class="header-right">
+          <button class="toggle-btn active" data-effect="blur">
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </button>
+          <span class="arrow"></span>
+        </div>
       </div>
       <div class="section-content">
-        <div class="row row-option active" data-effect="blur">
-          <div class="row-inner">
-            <span class="label">ENABLED</span>
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </div>
-        </div>
         <div class="row row-slider" id="blurStrengthRow">
           <div class="row-inner">
             <span class="label">STRENGTH</span>
@@ -791,15 +820,14 @@
     <div class="section collapsed">
       <div class="row row-header">
         <span class="label">GRAIN</span>
-        <span class="arrow"></span>
+        <div class="header-right">
+          <button class="toggle-btn active" data-effect="grain">
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </button>
+          <span class="arrow"></span>
+        </div>
       </div>
       <div class="section-content">
-        <div class="row row-option active" data-effect="grain">
-          <div class="row-inner">
-            <span class="label">ENABLED</span>
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </div>
-        </div>
         <div class="row row-option active" data-effect="grainAnimated">
           <div class="row-inner">
             <span class="label">ANIMATED</span>
@@ -2517,7 +2545,11 @@
 
     // Effect toggles (pattern, palette, bloom, blur, wireframe)
     document.querySelectorAll('[data-effect]').forEach(option => {
-      option.addEventListener('click', () => {
+      option.addEventListener('click', (e) => {
+        // Stop propagation for header toggle buttons to prevent expand/collapse
+        if (option.classList.contains('toggle-btn')) {
+          e.stopPropagation();
+        }
         const effectName = option.dataset.effect;
 
         if (effectName === 'pattern-ripple') {
