@@ -634,7 +634,12 @@
     <div class="section">
       <div class="row row-header">
         <span class="label">PATTERN</span>
-        <span class="arrow"></span>
+        <div class="header-right">
+          <button class="toggle-btn active" data-effect="pattern">
+            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
+          </button>
+          <span class="arrow"></span>
+        </div>
       </div>
       <div class="section-content">
         <div class="row row-option active" data-effect="pattern-ripple">
@@ -1538,7 +1543,7 @@
           }
         } else {
           // WAVEFORM: Use per-vertex displacement attribute
-          effectDisplacement = displacement * uWaveformScale * uHoverProgress;
+          effectDisplacement = displacement * uWaveformScale * uHoverProgress * uRippleProgress;
 
           // Waveform always uses corner pinning
           effectDisplacement *= cornerMask;
@@ -2552,17 +2557,22 @@
         }
         const effectName = option.dataset.effect;
 
-        if (effectName === 'pattern-ripple') {
+        if (effectName === 'pattern') {
+          rippleEnabled = !rippleEnabled;
+          option.classList.toggle('active', rippleEnabled);
+        } else if (effectName === 'pattern-ripple') {
           patternType = 'ripple';
           rippleEnabled = true;
           document.querySelector('[data-effect="pattern-ripple"]').classList.add('active');
           document.querySelector('[data-effect="pattern-waveform"]').classList.remove('active');
+          document.querySelector('[data-effect="pattern"]').classList.add('active');
           togglePatternSliders('ripple');
         } else if (effectName === 'pattern-waveform') {
           patternType = 'waveform';
           rippleEnabled = true;
           document.querySelector('[data-effect="pattern-waveform"]').classList.add('active');
           document.querySelector('[data-effect="pattern-ripple"]').classList.remove('active');
+          document.querySelector('[data-effect="pattern"]').classList.add('active');
           togglePatternSliders('waveform');
         } else if (effectName === 'palette') {
           paletteEnabled = !paletteEnabled;
