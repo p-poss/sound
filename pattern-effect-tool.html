@@ -425,9 +425,23 @@
       display: block;
     }
 
-    /* Audio panel: no translate needed - panel shift from bottom anchor handles positioning */
-    .audio-panel .section.collapsed .section-content .row-inner {
-      transform: translateY(0);
+    .audio-panel .row-option {
+      padding: 0;
+      background: rgba(58, 62, 68, 0.7);
+      backdrop-filter: blur(20px);
+    }
+
+    .audio-panel .row-option:hover {
+      background: rgba(0,0,0,0.35);
+    }
+
+    .audio-panel .row-option .row-inner {
+      height: 54px;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      justify-content: space-between;
+      width: 100%;
     }
 
     #audioFileInput {
@@ -830,18 +844,10 @@
 
   <!-- Audio Controls Panel -->
   <div class="audio-panel">
-    <div class="section">
-      <div class="row row-header">
-        <span class="label">AUDIO</span>
-        <span class="arrow"></span>
-      </div>
-      <div class="section-content">
-        <div class="row row-option" id="audio-play-toggle">
-          <div class="row-inner">
-            <span class="label">PLAY / PAUSE</span>
-            <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
-          </div>
-        </div>
+    <div class="row row-option" id="audio-play-toggle">
+      <div class="row-inner">
+        <span class="label">PLAY/PAUSE</span>
+        <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
       </div>
     </div>
     <div class="button-row">
