@@ -109,6 +109,7 @@
       background: rgba(0,0,0,0.35);
       border-radius: 3px;
       padding: 4px;
+      margin-right: 13px;
     }
 
     .row-header .toggle-opt {
@@ -686,7 +687,7 @@
             <span class="slider-value" id="rippleSpeedValue">0.05</span>
           </div>
         </div>
-        <div class="row row-option ripple-slider" data-effect="ripple-edge-damping">
+        <div class="row row-option ripple-slider active" data-effect="ripple-edge-damping">
           <div class="row-inner">
             <span class="label">EDGE DAMPING</span>
             <span class="check"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg></span>
@@ -1931,7 +1932,7 @@
     let rippleAmplitude = 0.05;
     let rippleSpeed = 0.05;
     let rippleTime = 0;
-    let rippleEdgeDamping = false;
+    let rippleEdgeDamping = true;
 
     // Waveform state
     let waveformAmplitude = 0.8;   // Height scale for waveform (higher peaks)
@@ -1978,7 +1979,7 @@
     const defaults = {
       paletteEnabled: true, speed: 0.5, frequency: 4, intensity: 2.5, strength: 2.5,
       patternType: 'ripple',
-      rippleEnabled: true, rippleFreq: 13.5, rippleAmplitude: 0.05, rippleSpeed: 0.05, rippleEdgeDamping: false,
+      rippleEnabled: true, rippleFreq: 13.5, rippleAmplitude: 0.05, rippleSpeed: 0.05, rippleEdgeDamping: true,
       waveformAmplitude: 0.8, waveformSensitivity: 50, waveformDirection: 'left-to-right',
       imageVisible: true, wireframeEnabled: false,
       bloomEnabled: true, bloomIntensity: 7.5, bloomThreshold: 5,
